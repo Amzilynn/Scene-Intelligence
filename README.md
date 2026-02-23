@@ -2,7 +2,7 @@
 
 A state-of-the-art CV pipeline for security camera analysis featuring YOLOv26-s, real-time person tracking, pose estimation, and a hybrid Service Provider Identification layer.
 
-## 🚀 Key Features
+## Key Features
 
 ### 💎 Core Intelligence
 - **YOLOv26-s Upgrade**: Leverages the latest YOLO26 architecture for ultra-efficient, end-to-end NMS-free human detection and pose estimation.
