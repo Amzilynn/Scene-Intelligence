@@ -7,9 +7,9 @@ from cv_pipeline.pose_estimation.rtm_pose import RTMPoseEstimator
 # Configuration constants
 
 MIN_HEIGHT_RATIO = 0.2
-CONF_HUMAN = 0.35
-CONF_POSE = 0.30
-CONF_FACE = 0.40
+CONF_HUMAN = 0.50
+CONF_POSE = 0.50
+CONF_FACE = 0.50
 IOU_HUMAN = 0.45
 IMG_SIZE = 640
 

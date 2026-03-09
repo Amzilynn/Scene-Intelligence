@@ -64,6 +64,7 @@ class PersonTracker:
         tracks = self.tracker.update(dets_array, frame)
 
         if tracks.shape[0] > 0:
+            assigned_tracks = set()
             for det in detections:
                 det_bbox = np.array(det['bbox'])
 
@@ -71,6 +72,8 @@ class PersonTracker:
                 best_iou = 0
 
                 for j, trk in enumerate(tracks):
+                    if j in assigned_tracks:
+                        continue
                     track_bbox = trk[:4]
                     iou = self._compute_iou(det_bbox, track_bbox)
                     if iou > best_iou:
@@ -78,14 +81,13 @@ class PersonTracker:
                         best_idx = j
 
                 if best_idx >= 0 and best_iou > 0.3:
+                    assigned_tracks.add(best_idx)
                     track_id = int(tracks[best_idx, 4])
                     det['track_id'] = track_id
                     det['track_color'] = self.id_colors[track_id % len(self.id_colors)]
                     
-                    # Store features if available in the tracker
-                    # BoxMOT trackers usually store features in trk[...] if configured
-                    # but here we might need to rely on the fact that BoostTrack uses ReID internally.
-                    # As a fallback, we'll signal that this track is 'active'
+                    # Apply Kalman-smoothed bounding box from tracker to prevent flickering
+                    det['bbox'] = tuple(tracks[best_idx, :4])
                 else:
                     det['track_id'] = -1
                     det['track_color'] = (128, 128, 128)
