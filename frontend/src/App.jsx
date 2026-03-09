@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
     Users, Zap, Activity, MessageSquare, ShieldCheck, Upload, X,
-    Eye, TrendingUp, BarChart3, Navigation, Brain, Loader, ChevronRight
+    Eye, TrendingUp, BarChart3, Navigation, Brain, Loader, ChevronRight, Star
 } from 'lucide-react';
 import {
     AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -401,20 +401,58 @@ export default function App() {
                                 <div className="processing-overlay">
                                     <div className="hud-scanner" />
                                     <div className="hud-corners" />
-                                    <div className="hud-data top-left"><Activity size={12} /> ENGINE: ACTIVE</div>
-                                    <div className="hud-data top-right"><Zap size={12} /> PROGRESS: {processPct}%</div>
-                                    <div className="hud-data bottom-left"><Brain size={12} /> VISIONINTEL CORE v2.5</div>
-                                    <div className="hud-data bottom-right"><ShieldCheck size={12} /> SECURE STREAM</div>
+                                    <div className="hud-data top-left"><Activity size={12} /> AI SENSORS: ONLINE</div>
+                                    <div className="hud-data top-right"><Zap size={12} /> TRACKING: {processPct}%</div>
+                                    <div className="hud-data bottom-left"><Brain size={12} /> RETAIL INTELLIGENCE v4.0</div>
+                                    <div className="hud-data bottom-right"><ShieldCheck size={12} /> GDPR COMPLIANT</div>
 
                                     <div className="hud-center">
                                         <Loader size={54} className="spin hud-loader" />
-                                        <div className="hud-title">SCANNING INTERACTIVE SCENE</div>
-                                        <div className="hud-sub">EXTRACTING SPATIO-TEMPORAL ANALYTICS</div>
+                                        <div className="hud-title">ANALYZING SHOPPER BEHAVIOR</div>
+                                        <div className="hud-sub">MAPPING ENGAGEMENT & FLOW METRICS</div>
                                         <div className="prog-track hud-track"><div className="prog-fill" style={{ width: `${processPct}%` }} /></div>
                                         <div className="hud-pct">{processPct}%</div>
                                     </div>
                                 </div>
                             )}
+                            {/* Insights Overlay (Final Summary) */}
+                            {pipeline.status === 'done' && (
+                                <div className="insights-overlay">
+                                    {(() => {
+                                        const topZone = Object.entries(stats.zone_activity || {}).sort((a, b) => b[1] - a[1])[0];
+                                        const posEmos = (stats.emotions_breakdown?.happy || 0) + (stats.emotions_breakdown?.surprise || 0);
+                                        const totalEmos = Object.values(stats.emotions_breakdown || {}).reduce((a, b) => a + b, 0);
+                                        const sentiment = totalEmos ? Math.round((posEmos / totalEmos) * 100) : 0;
+
+                                        return (
+                                            <>
+                                                <div className="insight-card">
+                                                    <div className="insight-icon"><Navigation size={18} /></div>
+                                                    <div className="insight-content">
+                                                        <span className="insight-label">Top Conversion Zone</span>
+                                                        <span className="insight-value">{topZone ? topZone[0] : 'Scanning...'}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="insight-card">
+                                                    <div className="insight-icon"><TrendingUp size={18} /></div>
+                                                    <div className="insight-content">
+                                                        <span className="insight-label">Shopper Sentiment</span>
+                                                        <span className="insight-value">{sentiment > 50 ? 'Positive' : 'Balanced'} ({sentiment}%)</span>
+                                                    </div>
+                                                </div>
+                                                <div className="insight-card">
+                                                    <div className="insight-icon"><Star size={18} /></div>
+                                                    <div className="insight-content">
+                                                        <span className="insight-label">Engagement Level</span>
+                                                        <span className="insight-value">{stats.engagement_score > 70 ? 'PREMIUM' : 'OPTIMAL'}</span>
+                                                    </div>
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+
                             {/* Idle state */}
                             {!uploadedVideoUrl && !outputVideoUrl && !isProcessing && (
                                 <div className="idle-state" onClick={() => fileInputRef.current.click()}>
