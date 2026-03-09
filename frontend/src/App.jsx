@@ -161,7 +161,12 @@ export default function App() {
         fetch(`${API}/stats/summary`).then(r => r.json()).then(setStats).catch(() => { });
     }, []);
 
-    useEffect(() => { fetchStats(); const iv = setInterval(fetchStats, 5000); return () => clearInterval(iv); }, [fetchStats]);
+    useEffect(() => {
+        fetch(`${API}/reset`, { method: 'POST' }).catch(() => { });
+        fetchStats();
+        const iv = setInterval(fetchStats, 5000);
+        return () => clearInterval(iv);
+    }, [fetchStats]);
 
     useEffect(() => {
         const connect = () => {

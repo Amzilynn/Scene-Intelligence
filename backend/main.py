@@ -65,6 +65,32 @@ async def get_output_video():
     )
 
 
+@app.post("/reset")
+async def reset_state():
+    """Clear all processed data so the frontend starts fresh on reload."""
+    global pipeline_state
+    if pipeline_state["status"] in ["done", "error", "idle"]:
+        pipeline_state.update({
+            "status": "idle",
+            "progress": 0,
+            "total_frames": 0,
+            "current_file": None,
+            "video_url": None,
+            "output_video": None,
+            "error": None
+        })
+        if os.path.exists(LOG_PATH):
+            try: os.remove(LOG_PATH)
+            except: pass
+        if os.path.exists(OUTPUT_VIDEO_PATH):
+            try: os.remove(OUTPUT_VIDEO_PATH)
+            except: pass
+        if os.path.exists(OUTPUT_VIDEO_PATH + ".raw.mp4"):
+            try: os.remove(OUTPUT_VIDEO_PATH + ".raw.mp4")
+            except: pass
+    return {"status": "ok"}
+
+
 @app.post("/upload")
 async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     """Upload a video file and automatically start processing."""
@@ -296,10 +322,14 @@ async def websocket_endpoint(websocket: WebSocket):
                         pos = f.tell()
             
             await asyncio.sleep(0.5)
-    except (WebSocketDisconnect, asyncio.CancelledError):
+    except (WebSocketDisconnect, asyncio.CancelledError, ConnectionResetError):
         pass
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        # Ignore standard Windows connection reset errors commonly thrown by asyncio/uvicorn
+        if "10054" in str(e) or "10053" in str(e):
+            pass
+        else:
+            print(f"WebSocket error: {e}")
     finally:
         try:
             await websocket.close()

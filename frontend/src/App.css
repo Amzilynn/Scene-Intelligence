@@ -32,7 +32,6 @@ html,
 body,
 #root {
     height: 100%;
-    overflow: hidden;
 }
 
 body {
@@ -233,7 +232,8 @@ body {
 .body {
     display: flex;
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 /* ── Sidebar ── */
@@ -393,12 +393,12 @@ body {
 /* ── Main ── */
 .main {
     flex: 1;
-    overflow: hidden;
     display: grid;
     grid-template-rows: 1fr auto;
     grid-template-columns: 1fr 280px;
     gap: 1px;
     background: var(--c-border);
+    min-height: 700px;
 }
 
 .video-panel {
