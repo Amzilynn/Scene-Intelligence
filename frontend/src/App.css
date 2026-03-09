@@ -517,9 +517,10 @@ body {
     position: absolute;
     inset: 0;
     z-index: 10;
-    background: rgba(3, 5, 10, 0.75);
-    backdrop-filter: blur(8px);
+    background: transparent;
+    backdrop-filter: none;
     overflow: hidden;
+    pointer-events: none;
 }
 
 /* Cinematic scanner overlay effect inside the processing view */

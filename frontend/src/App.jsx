@@ -165,9 +165,10 @@ export default function App() {
     useEffect(() => {
         fetch(`${API}/reset`, { method: 'POST' }).catch(() => { });
         fetchStats();
-        const iv = setInterval(fetchStats, 5000);
+        const intervalTime = isProcessing ? 2000 : 5000;
+        const iv = setInterval(fetchStats, intervalTime);
         return () => clearInterval(iv);
-    }, [fetchStats]);
+    }, [fetchStats, isProcessing]);
 
     useEffect(() => {
         const connect = () => {
@@ -406,12 +407,10 @@ export default function App() {
                                     <div className="hud-data bottom-left"><Brain size={12} /> RETAIL INTELLIGENCE v4.0</div>
                                     <div className="hud-data bottom-right"><ShieldCheck size={12} /> GDPR COMPLIANT</div>
 
-                                    <div className="hud-center">
-                                        <Loader size={54} className="spin hud-loader" />
-                                        <div className="hud-title">ANALYZING SHOPPER BEHAVIOR</div>
-                                        <div className="hud-sub">MAPPING ENGAGEMENT & FLOW METRICS</div>
-                                        <div className="prog-track hud-track"><div className="prog-fill" style={{ width: `${processPct}%` }} /></div>
-                                        <div className="hud-pct">{processPct}%</div>
+                                    <div className="hud-center" style={{ top: 'auto', bottom: '15%', height: 'auto', gap: '0.4rem' }}>
+                                        <div className="hud-title" style={{ fontSize: '0.9rem', letterSpacing: '4px' }}>ANALYZING SHOPPER BEHAVIOR...</div>
+                                        <div className="prog-track hud-track" style={{ width: '400px' }}><div className="prog-fill" style={{ width: `${processPct}%` }} /></div>
+                                        <div className="hud-pct" style={{ fontSize: '0.6rem' }}>COMPUTING RETAIL INTELLIGENCE ({processPct}%)</div>
                                     </div>
                                 </div>
                             )}
