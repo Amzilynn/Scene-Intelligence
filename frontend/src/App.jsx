@@ -158,6 +158,7 @@ export default function App() {
     const [filterType, setFilterType] = useState(null);
     const [filterValue, setFilterValue] = useState(null);
     const [isDragging, setIsDragging] = useState(false);
+    const [showIntro, setShowIntro] = useState(false);
     const [uploadedVideoUrl, setUploadedVideoUrl] = useState(null);
     const [outputVideoUrl, setOutputVideoUrl] = useState(null);
     const [stats, setStats] = useState({
@@ -272,7 +273,12 @@ export default function App() {
             setUploadProgress(90);
             await res.json();
             setUploadProgress(100);
-            setTimeout(() => { setIsUploading(false); setUploadProgress(0); }, 600);
+            setShowIntro(true); // Trigger 3s intro splash
+            setTimeout(() => {
+                setIsUploading(false);
+                setUploadProgress(0);
+                setTimeout(() => setShowIntro(false), 3000);
+            }, 600);
         } catch { setIsUploading(false); alert('Backend offline?'); }
     }, []);
 
@@ -416,18 +422,21 @@ export default function App() {
                             {/* Processing overlay */}
                             {isProcessing && (
                                 <div className="processing-overlay">
-                                    <div className="hud-scanner" />
                                     <div className="hud-corners" />
                                     <div className="hud-data top-left"><Activity size={12} /> AI SENSORS: ONLINE</div>
                                     <div className="hud-data top-right"><Zap size={12} /> TRACKING: {processPct}%</div>
                                     <div className="hud-data bottom-left"><Brain size={12} /> RETAIL INTELLIGENCE v4.0</div>
                                     <div className="hud-data bottom-right"><ShieldCheck size={12} /> GDPR COMPLIANT</div>
 
-                                    <div className="hud-center" style={{ top: 'auto', bottom: '15%', height: 'auto', gap: '0.4rem' }}>
-                                        <div className="hud-title" style={{ fontSize: '0.9rem', letterSpacing: '4px' }}>ANALYZING SHOPPER BEHAVIOR...</div>
-                                        <div className="prog-track hud-track" style={{ width: '400px' }}><div className="prog-fill" style={{ width: `${processPct}%` }} /></div>
-                                        <div className="hud-pct" style={{ fontSize: '0.6rem' }}>COMPUTING RETAIL INTELLIGENCE ({processPct}%)</div>
-                                    </div>
+                                    {showIntro && (
+                                        <div className="intro-splash">
+                                            <div className="splash-content">
+                                                <Loader size={36} className="spin splash-loader" />
+                                                <div className="splash-title">INITIALIZING RETAIL INTELLIGENCE</div>
+                                                <div className="splash-sub">CALIBRATING AI SENSORS & NEURAL NETWORKS</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                             {/* Insights Overlay (Final Summary) */}
@@ -475,7 +484,7 @@ export default function App() {
                                     <p>Upload or drop a video to begin</p>
                                 </div>
                             )}
-                            {!outputVideoUrl && <div className="scan-line" />}
+
                         </div>
                     </div>
 
