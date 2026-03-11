@@ -1,106 +1,64 @@
-# Computer Vision Pipeline
-A comprehensive CV pipeline for security camera analysis with real-time person detection, tracking, pose estimation, emotion analysis, and social interaction detection.
-##  Features
-###  Implemented
-- **Object Detection** - YOLOv8-l for human detection
-- **Multi-Object Tracking** - BoxMOT (DeepOCSORT) for persistent ID assignment
-- **Pose Estimation** - MediaPipe BlazePose for skeleton tracking
-- **Emotion Analysis** - DeepFace for facial emotion recognition
-- **Scene Logging** - Text-based scene description with timestamps
-- **Social Interaction Analysis (STAS)** - Context aware interaction detection
-## 📁 Project Structure
-```
+# IA Camera Challenge - Scene Intelligence Pipeline
+
+A high-performance computer vision pipeline for human-centric scene understanding, featuring Scene Graph Generation (SGG), real-time social interaction analysis, and a premium HUD visualization.
+
+## Key Features
+
+### Scene Intelligence
+- **REACT++ Integration**: Leverages state-of-the-art Scene Graph Generation for real-time object and relationship detection.
+- **Social Interaction Index (STAS)**: Advanced temporal analysis of human-to-human relationships, including talking, physical contact, and social proximity.
+- **Automated Role Discovery**: Distinguishes between Staff and Visitors based on mobility, social centrality, and Hand-Object Interaction (HOI) patterns.
+- **Temporal Smoothing**: Implements a 10-frame majority-voting buffer to eliminate semantic flickering and ensure stable interaction labels.
+
+### Premium HUD Visualization
+- **Glassmorphism Interface**: Semi-transparent, dark-themed intelligence cards for roles and satisfaction metrics.
+- **Anti-Aliased Typography**: High-quality PIL-based rendering for professional-grade text and graphics.
+- **Glow-Effect Relationships**: Cyan-glowing "energy cords" visualize social dynamics between individuals.
+- **Customer Satisfaction Index**: Real-time dashboard calculating aggregate visitor happiness from emotion trends.
+
+### Robust CV Core
+- **Multi-Object Tracking**: DEEPOCSORT (via BoxMOT) for persistent person identification.
+- **HSEmotion Analysis**: State-of-the-art emotion detection for real-time satisfaction monitoring.
+- **MiVOLO Demographics**: Precise age and gender estimation using face and body features.
+- **Structured Logging**: Frame-by-frame JSONL output for downstream data science and analytics.
+
+## Repository Structure
+
+```bash
 IA-Camera-Challenge/
 ├── cv_pipeline/
-│   ├── detection/          # YOLOv8 detection module
+│   ├── detection/          # REACT++ SGG & Human Detection
 │   ├── tracking/           # BoxMOT tracking module
-│   ├── pose_estimation/    # MediaPipe pose module
-│   ├── emotion_analysis/   # DeepFace emotion module
-│   └── utils/              # Scene describer & utilities
+│   ├── pose_estimation/    # RTMPose & Pose Analysis
+│   ├── emotion_analysis/   # HSEmotion & MiVOLO
+│   ├── social_interaction/ # SocialAnalyzer & Role Discovery
+│   └── utils/              # UIProcessor HUD & Scene Describer
 ├── scripts/
-│   └── run_full_pipeline.py  # Main entry point
-├── vd2.mp4                 # Input video
-├── output.mp4              # Annotated video output
-└── scene_log.txt           # Frame-by-frame text log
+│   ├── run_full_pipeline.py  # Main entry point
+│   └── download_model.py     # Model setup helper
+├── models/                 # Model weights (REACT++, RTMPose, Face)
+└── scene_log.json          # Structured frame-by-frame data
 ```
-##  Quick Start
+
+## Quick Start
+
 ### Prerequisites
-- Python 3.12
-- Virtual environment (recommended)
-- CUDA-capable GPU (optional, CPU fallback available)
+- Python 3.11+
+- NVIDIA GPU with CUDA 12.1+ support
+
 ### Installation
-1. **Clone the repository**
-```bash
-git clone https://github.com/Amzilynn/IA-Camera-Challenge.git
-cd IA-Camera-Challenge
-```
-2. **Create virtual environment**
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-3. **Install dependencies**
-```bash
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121  # For CUDA
-# OR for CPU-only:
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install -r requirements.txt
-```
+1. Setup virtual environment: `python -m venv venv`
+2. Install dependencies: `pip install -r requirements.txt`
+3. Ensure model weights are placed in the models/ directory as specified in the configuration.
+
 ### Usage
-**Run the full pipeline:**
 ```bash
-python scripts/run_full_pipeline.py
-```
-**Outputs:**
-- `output.mp4` - Annotated video with bounding boxes, IDs, skeletons, and emotion labels
-- `scene_log.txt` - Timestamped text log of detections
-##  Pipeline Architecture
-```mermaid
-graph LR
-    A[Video Input] --> B[YOLOv8 Detection]
-    B --> C[BoxMOT Tracking]
-    C --> D[MediaPipe Pose]
-    D --> E[DeepFace Emotion]
-    E --> F[Scene Describer]
-    F --> G[Visualization]
-    G --> H[Output Video]
-    F --> I[Scene Log]
-```
-##  Technical Details
-### Detection (YOLOv8)
-- **Model**: YOLOv8-l
-- **Classes**: Person, pose keypoints, face regions
-- **Confidence**: 0.5 threshold
-### Tracking (BoxMOT)
-- **Algorithm**: DeepOCSORT (BoostTrack)
-- **Features**: Persistent IDs, trajectory tracking, occlusion handling
-### Pose (MediaPipe)
-- **Model**: BlazePose
-- **Keypoints**: 33 body landmarks (3D coordinates)
-- **Skeleton**: Shoulders, elbows, hips, knees, ankles
-### Emotion (DeepFace)
-- **Model**: VGG-Face
-- **Emotions**: angry, sad, happy, fear, neutral, surprise
-- **Frequency**: Every 5 frames (performance optimization)
-##  Output Format
-### Visual Output (`output.mp4`)
-- Green bounding boxes around detected persons
-- Persistent ID labels (e.g., "ID: 1")
-- Yellow/cyan skeleton overlay (MediaPipe keypoints)
-- Red emotion text above heads
-### Text Output (`scene_log.txt`)
-```
-Scene Log Started: 2026-01-04 19:37:19
---------------------------------------------------
-19:38:02.298 | [Frame 1] ID 1: Pose=Tracked
-19:39:16.701 | [Frame 5] ID 1: Emotion=sad Pose=Tracked | [Frame 5] ID 2: Emotion=happy Pose=Tracked
+python cv_pipeline/scripts/run_full_pipeline.py [video_path] --output [output_name.mp4]
 ```
 
+## Outputs
+- **Annotated Video**: High-quality MP4 with ID, Role, Satisfaction, and Interaction HUD.
+- **Intelligence Log**: JSONL structured data file for high-level scene metrics and behavioral analysis.
 
-## Authors
-**Amzilynn** - [GitHub](https://github.com/Amzilynn)
-## Acknowledgments
-- **YOLOv8** - Ultralytics
-- **BoxMOT** - Multi-object tracking library
-- **MediaPipe** - Google
-- **DeepFace** - Facial analysis framework
+---
+**Maintained by**: Amzilynn | **Engine**: REACT++ SGG + Custom Scene Intelligence
