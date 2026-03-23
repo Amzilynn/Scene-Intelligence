@@ -7,35 +7,36 @@ A sophisticated, high-performance computer vision pipeline designed for human-ce
 ### REACT++ Scene Graph Generation
 The engine leverages REACT++ for advanced Scene Graph Generation (SGG). Beyond simple object detection, it maps relationships between humans and their environment, enabling a semantic understanding of the scene. It identifies triplets consisting of subjects, predicates, and objects to build a dynamic knowledge graph of every frame.
 
-### Spatial-Temporal Interaction Mode (STAS)
-The STAS module performs continuous analysis of human-to-human relationships. Key features include:
-- Synchronicity Analysis: Cross-correlation of movement velocity and head orientation to identify group bonding.
-- Personal Space Monitoring: Constructing dynamic polygons around tracked individuals to detect Intimate Space violations.
-- Interaction Smoothing: A temporal buffer system that uses majority-voting to eliminate semantic flickering and ensure stable relationship labels.
+### STAS: Spatial-Temporal Interaction Mode
+The STAS module performs continuous analysis of human-to-human relationships, moving beyond frame-by-frame detection into temporal behavioral patterns.
+- **Synchronicity Analysis**: Uses cross-correlation of movement velocity and head orientation to identify group bonding and mirrored behaviors.
+- **Personal Space Micro-Polygons**: Constructs dynamic "bubbles" around tracked individuals using 17-point pose keypoints to detect intimate space violations and social comfort zones.
+- **Intentional Focus (Ray Casting)**: Implements vector-based ray casting from a person's nose-to-neck axis to detect active engagement and "gaze intersection" with others.
 
 ### Specialized Human Analysis
-- HSEmotion Analysis: Utilizes state-of-the-art emotion detection models to track real-time satisfaction levels and sentiment trends.
-- MiVOLO Demographics: Provides high-precision age and gender estimation using multi-modal face and body feature extraction.
-- RTMPose Estimation: High-frequency pose tracking used for posture detection (Standing, Sitting, Crouching) and gesture analysis.
+- **HSEmotion Analysis**: State-of-the-art emotion detection models track real-time satisfaction levels and sentiment trends.
+- **MiVOLO Demographics**: High-precision age and gender estimation using multi-modal face and body feature extraction.
+- **RTMPose Estimation**: High-frequency pose tracking used for posture detection (Standing, Sitting, Crouching) and complex gesture analysis.
 
 ## Advanced Behavioral Insights
 
-### Unsupervised Role Discovery
-The pipeline automatically distinguishes between different roles (e.g., Staff vs. Visitors) without manual labeling. This is achieved through an multi-factor algorithm analyzing:
-- Spatial Centrality: Persistence at specific service posts or counters.
-- Mobility Index: Analysis of total distance covered relative to time elapsed.
-- Hand-Object Interaction (HOI): Tracking interactions with specific equipment such as cashier registries or office hardware.
+### Unsupervised Role Discovery (V2)
+The pipeline automatically distinguishes between different roles (e.g., Staff vs. Visitors) using a multi-factor behavioral algorithm:
+- **Spatial Centrality & Mobility Index**: Analyzes persistence at specific service posts vs. general movement patterns.
+- **Social Reach**: Tracks the number of unique interactions and engagements per individual.
+- **Hand-Object Interaction (HOI)**: Detects precise interactions with business-critical equipment like registries, laptops, and service hardware.
 
-### Intent & Security Analytics
-The system detects specific behavioral patterns to generate actionable insights:
-- Scanning Behavior: Identifies stationary individuals with high-variance head orientation, signaling a need for pre-emptive service.
-- Theft Heuristics: Monitors hand occlusion and orientation relative to high-value objects and staff presence.
+### Intent & Service Analytics
+The system detects specific behavioral patterns to generate actionable alerts:
+- **Pre-emptive Service (Scanning)**: Identifies stationary individuals with high-variance head movements, signaling they are looking for assistance before they even ask.
+- **Security Heuristics**: Monitors hand occlusion and orientation relative to high-value objects and staff presence to flag unusual behavior.
 
 ## Cinematic HUD Visualization
-The visualization engine features a professional-grade HUD with:
-- Glassmorphism Interface: Semi-transparent, blur-effect intelligence cards for role and satisfaction metrics.
-- Glowing Energy Links: Curved Bezier pulses that visualize social dynamics and interaction types between individuals.
-- Dynamic Dashboard: A real-time summary of total counts, staff-to-visitor ratios, active engagements, and the Customer Satisfaction Index.
+The visualization engine features a professional-grade, "Cyber-Agent" HUD designed for clarity and impact:
+- **Glassmorphism Interface**: Semi-transparent, Gaussian-blurred intelligence cards for role and satisfaction metrics, providing a true frosted glass effect.
+- **Glowing Energy Links**: Adaptive Bezier pulses that visualize social dynamics and interaction types (Talking, Service, Group Bond) between individuals.
+- **Dynamic System Vibe Dashboard**: A real-time summary of the "Vibe Analysis" (Status: Nominal/Critical), staff-to-visitor ratios, and the aggregate Customer Satisfaction Index.
+- **Interactive Scanlines & Edge Glow**: Cinematic overlays that react to the scene's overall satisfaction and activity levels.
 
 ## Repository Structure
 
@@ -45,9 +46,9 @@ IA-Camera-Challenge/
 │   ├── detection/          # REACT++ SGG and human detection
 │   ├── tracking/           # DEEPOCSORT multi-object tracking
 │   ├── emotion_analysis/   # HSEmotion sentiment tracking
-│   ├── social_interaction/ # STAS relationship engine
+│   ├── social_interaction/ # STAS relationship engine & Role Discovery
 │   ├── pose_estimation/    # RTMPose analysis
-│   └── utils/              # Cinematic HUD and scene logs
+│   └── utils/              # UIProcessor (Glassmorphism HUD) & Scene Describer
 ├── SGG-Benchmark/          # Core SGG weights and utilities
 ├── models/                 # Pre-trained deep learning weights
 └── scripts/                # Entry points for batch and real-time processing
@@ -79,7 +80,7 @@ python cv_pipeline/scripts/run_full_pipeline.py [video_path] --output [output_na
 ```
 
 ## Data Output
-The system generates a high-fidelity intelligence log in JSONL format, documenting every detected entity, relationship, and behavioral event with precise timestamps for downstream analytical processing.
+The system generates a high-fidelity intelligence log in JSONL format, documenting every detected entity, relationship, and behavioral event with precise temporal markers for downstream analytical processing.
 
 ---
 **Maintained by**: Amzilynn | **Engine**: REACT++ SGG + Custom Scene Intelligence

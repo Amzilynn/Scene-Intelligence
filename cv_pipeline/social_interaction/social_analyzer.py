@@ -140,15 +140,61 @@ class SocialAnalyzer:
                 'pose': det.get('pose_keypoints')
             })
 
-    def analyze(self, detections, environment_objects=[]):
+    def _is_moving_towards(self, id1, id2, threshold=5.0):
+        if id1 not in self.history or id2 not in self.history: return False
+        h1, h2 = self.history[id1], self.history[id2]
+        if len(h1) < 2 or len(h2) < 2: return False
+        
+        d_curr = np.linalg.norm(h1[-1]['pos'] - h2[-1]['pos'])
+        d_prev = np.linalg.norm(h1[-2]['pos'] - h2[-2]['pos'])
+        return (d_prev - d_curr) > threshold
+
+    def analyze(self, detections, relationships=[], environment_objects=[]):
         current_time = time.time()
         self.update_history(detections, current_time)
         found_interactions = []
         
         tracked_dets = [d for d in detections if d.get('track_id', -1) != -1]
         
-        # 1. Update Intent & Synchronicity Graph
-        current_pair_states = set()
+        # Mapping track_id to sgg_index for relationship lookup
+        tid_to_sgg = {d['track_id']: d['sgg_index'] for d in detections if 'track_id' in d and 'sgg_index' in d}
+        sgg_to_tid = {v: k for k, v in tid_to_sgg.items()}
+
+        # 1. Collect Raw Candidates from SGG RELATIONSHIPS (Primary Semantic Source)
+        raw_pair_candidates = defaultdict(list)
+        
+        # Map indices to classes for quick lookup
+        idx_to_class = {d['sgg_index']: d['type'] for d in detections if 'sgg_index' in d}
+        
+        for rel in relationships:
+            s_idx, o_idx = rel['subject_idx'], rel['object_idx']
+            
+            # STRICT FILTER: Only consider Person-to-Person relationships for social analysis
+            if idx_to_class.get(s_idx) != 'person' or idx_to_class.get(o_idx) != 'person':
+                continue
+                
+            if s_idx in sgg_to_tid and o_idx in sgg_to_tid:
+                id1, id2 = sgg_to_tid[s_idx], sgg_to_tid[o_idx]
+                if id1 == id2: continue # Ignore self-relationships if any
+                
+                pair_ids = tuple(sorted((id1, id2)))
+                label = rel['label'].strip().lower()
+                
+                # Map SGG labels to Social Interaction labels
+                itype = None
+                if any(x in label for x in ["looking at", "talking", "facing"]): 
+                    itype = "Talking"
+                elif any(x in label for x in ["touching", "holding", "contact"]):
+                    itype = "Physical Contact"
+                elif any(x in label for x in ["standing next to", "alongside", "beside"]):
+                    itype = "Approaching" if self._is_moving_towards(id1, id2) else "Social Proximity"
+                
+                if itype:
+                    # De-duplicate within the same frame: only one label per pair
+                    if itype not in raw_pair_candidates[pair_ids]:
+                        raw_pair_candidates[pair_ids].append(itype)
+
+        # 2. Update Intent & Synchronicity Graph (Heuristic Fallback/Augmentation)
         
         # Track distance for role discovery
         for det in tracked_dets:
@@ -168,8 +214,7 @@ class SocialAnalyzer:
                 # Check Synchronicity
                 sync = self._compute_synchronicity(id1, id2)
                 if sync > 0.85:
-                    found_interactions.append({'ids': pair_ids, 'type': 'Group_Bond'})
-                    current_pair_states.add((pair_ids[0], pair_ids[1], 'Group_Bond'))
+                    raw_pair_candidates[pair_ids].append('Group_Bond')
 
                 # Personal Space Polygon Check
                 poly1 = self._get_personal_space_polygon(tracked_dets[i].get('pose_keypoints'), tracked_dets[i]['bbox'])
@@ -183,8 +228,36 @@ class SocialAnalyzer:
                     if focus_a or focus_b:
                         itype = self._detect_pair_interaction(tracked_dets[i], tracked_dets[j])
                         if itype:
-                            current_pair_states.add((pair_ids[0], pair_ids[1], itype))
-                            found_interactions.append({'ids': pair_ids, 'type': itype})
+                            raw_pair_candidates[pair_ids].append(itype)
+
+        # 3. TEMPORAL SMOOTHING (Anti-Flicker Logic)
+        current_pair_states = set()
+        from collections import Counter
+        
+        # Consider all pairs that were active in the last few frames or are active now
+        all_potential_pairs = set(raw_pair_candidates.keys()) | set(self.interaction_buffer.keys())
+        
+        for pair_ids in list(all_potential_pairs):
+            # If pair is no longer in frame, eventually remove it
+            if pair_ids[0] not in [d['track_id'] for d in tracked_dets] or \
+               pair_ids[1] not in [d['track_id'] for d in tracked_dets]:
+                self.interaction_buffer[pair_ids].append(None)
+                if all(x is None for x in self.interaction_buffer[pair_ids]):
+                    del self.interaction_buffer[pair_ids]
+                continue
+
+            # Update buffer with current estimate(s)
+            current_raw = raw_pair_candidates.get(pair_ids, [None])
+            # For simplicity, we take the FIRST candidate if multiple exist (rare)
+            self.interaction_buffer[pair_ids].append(current_raw[0])
+            
+            # Majority vote over the buffer
+            valid_votes = [v for v in self.interaction_buffer[pair_ids] if v is not None]
+            if len(valid_votes) > len(self.interaction_buffer[pair_ids]) * 0.4: # 40% threshold for "stability"
+                most_stable, count = Counter(valid_votes).most_common(1)[0]
+                if count >= 3: # Minimum 3 frames of agreement to prevent momentary noise
+                    found_interactions.append({'ids': pair_ids, 'type': most_stable})
+                    current_pair_states.add((pair_ids[0], pair_ids[1], most_stable))
                             
         self.active_interactions = current_pair_states # Update for role discovery
 
@@ -203,8 +276,8 @@ class SocialAnalyzer:
             person_statuses[tid] = {
                 'role': role,
                 'intent': self._get_intent_text(tid),
-                # ... other existing status fields ...
-                'engaged': tid in {k[0] for k in current_pair_states} or tid in {k[1] for k in current_pair_states}
+                'engaged': tid in {k[0] for k in current_pair_states} or tid in {k[1] for k in current_pair_states},
+                'proximity_metrics': det.get('proximity_metrics')
             }
 
         return found_interactions, person_statuses
@@ -232,6 +305,8 @@ class SocialAnalyzer:
                 return True
         return False
 
+    STAFF_OBJECT_LABELS = ['laptop', 'computer', 'desk', 'keyboard', 'mouse', 'monitor', 'registry', 'cashier']
+
     def _discover_role_v2(self, det, objects, current_time):
         tid = det['track_id']
         if tid not in self.role_stats:
@@ -241,10 +316,24 @@ class SocialAnalyzer:
                 'hoi_count': 0, 
                 'open_palm_frames': 0, 
                 'start_time': current_time, 
-                'unique_contacts': set()
+                'unique_contacts': set(),
+                'staff_proximity_count': 0,
+                'total_frames': 0
             }
         
         stats = self.role_stats[tid]
+        stats['total_frames'] += 1
+        
+        # Check proximity to staff-related objects
+        person_center = self._get_center(det['bbox'])
+        for obj in objects:
+            obj_type = obj.get('type', obj.get('label', 'unknown')).lower()
+            if obj_type in self.STAFF_OBJECT_LABELS:
+                obj_center = self._get_center(obj['bbox'])
+                dist = np.linalg.norm(person_center - obj_center)
+                if dist < 150: # Standard proximity threshold
+                    stats['staff_proximity_count'] += 1
+                    break
         
         # Check HOI: Is hand near object?
         kpts = det.get('pose_keypoints')
@@ -258,7 +347,7 @@ class SocialAnalyzer:
                         if (obj_bbox[0]-20 <= h[0] <= obj_bbox[2]+20 and 
                             obj_bbox[1]-20 <= h[1] <= obj_bbox[3]+20):
                             stats['hoi_count'] += 1
-                            stats['unique_contacts'].add(obj['label'])
+                            stats['unique_contacts'].add(obj.get('type', obj.get('label', 'unknown')))
                             
             # Check Gesture: Open Palm (Wrist to Elbow extension)
             # Simplistic: if distance is large enough relative to shoulder width
@@ -268,12 +357,30 @@ class SocialAnalyzer:
             if ext_l > 0.6 * sh_width or ext_r > 0.6 * sh_width:
                 stats['open_palm_frames'] += 1
 
-        # Logic for Staff Labeling
-        if stats['hoi_count'] > 50 and stats['open_palm_frames'] > 20:
-            return "Staff (Validated by HOI)"
+        # Logic for Staff Labeling: 
+        # Persistent proximity to staff objects + some hand activity
+        assigned = stats.get('assigned_role')
+        if assigned == "Staff":
+            role = "Staff"
+        else:
+            prox_ratio = stats.get('staff_proximity_count', 0) / stats['total_frames']
+            if stats['staff_proximity_count'] > 15 and prox_ratio > 0.1:
+                role = "Staff"
+                stats['assigned_role'] = "Staff"
+            else:
+                role = "Visitor"
+            
+        # Add telemetry for debugging
+        det['proximity_metrics'] = {
+            'prox_ratio': stats.get('staff_proximity_count', 0) / stats['total_frames'],
+            'prox_count': stats['staff_proximity_count'],
+            'total_frames': stats['total_frames'],
+            'hoi_count': stats['hoi_count'],
+            'open_palm': stats['open_palm_frames'],
+            'assigned': stats.get('assigned_role', 'none')
+        }
         
-        # Fallback to existing mobility based discovery
-        return self._discover_role(tid, current_time)
+        return role
 
     def _check_security_intent(self, det, objects):
         """Theft: Hand near high-value object + Orientation away from Staff."""
@@ -538,9 +645,9 @@ class SocialAnalyzer:
         return False
 
     def _discover_role(self, track_id, current_time):
-        """Unsupervised Role Discovery based on mobility and Social Network centrality."""
+        """Unsupervised Role Discovery based on mobility, Social reach, and Object proximity."""
         stats = self.role_stats.get(track_id)
-        if not stats: return "Unknown"
+        if not stats: return "Visitor"
         
         # Add current partner to interaction set
         for (id1, id2, itype) in self.active_interactions:
@@ -548,17 +655,27 @@ class SocialAnalyzer:
             if track_id == id2: stats['unique_interactions'].add(id1)
             
         time_elapsed = current_time - stats['start_time']
+        mobility = stats['total_distance'] / (time_elapsed + 1e-6)
+        social_reach = len(stats['unique_interactions'])
         
-        # Heuristic: Staff move a lot and talk to many different people
-        if time_elapsed > 15: # Reduced from 30s to 15s for faster feedback
-            mobility = stats['total_distance'] / time_elapsed
-            social_reach = len(stats['unique_interactions'])
-            
-            if mobility > 40 and social_reach >= 2:
+        proximity_ratio = stats.get('staff_proximity_count', 0) / (stats.get('total_frames', 1))
+        
+        # 1. CORE STAFF: Persistent presence + Stationary at Staff Objects
+        if time_elapsed > 15:
+            # High proximity to staff objects is a very strong signal
+            if proximity_ratio > 0.4 and mobility < 30:
                 return "Staff"
-            elif mobility < 15 and social_reach <= 1:
-                return "Visitor (Stationary)"
-            else:
-                return "Visitor (Mobile)"
+            
+            # Stationary Anchor (e.g. at a counter) with social reach
+            if mobility < 20 and social_reach >= 1 and proximity_ratio > 0.2:
+                return "Staff"
                 
-        return "Analyzing..."
+        # 2. VISITOR: Default if high mobility or low persistence
+        if mobility > 40:
+            return "Visitor"
+            
+        # 3. WAITING VISITOR: Persistent but not near staff objects
+        if time_elapsed > 30 and proximity_ratio < 0.1:
+            return "Visitor" # Even if persistent, they are customers/visitors if not at "staff posts"
+            
+        return "Visitor"

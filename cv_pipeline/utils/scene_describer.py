@@ -45,6 +45,7 @@ class SceneDescriber:
             if 'posture' in det: attrs['posture'] = det['posture']
             if 'activity' in det: attrs['activity'] = det['activity']
             if 'role' in det: attrs['role'] = det['role']
+            if 'proximity_metrics' in det: attrs['proximity_metrics'] = det['proximity_metrics']
             if 'mood_trend' in det: attrs['mood_trend'] = det['mood_trend']
             if 'group_id' in det and det['group_id'] != -1: attrs['group_id'] = det['group_id']
             if det.get('space_violated'): attrs['space_violation'] = True
