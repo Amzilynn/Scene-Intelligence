@@ -1,64 +1,85 @@
 # IA Camera Challenge - Scene Intelligence Pipeline
 
-A high-performance computer vision pipeline for human-centric scene understanding, featuring Scene Graph Generation (SGG), real-time social interaction analysis, and a premium HUD visualization.
+A sophisticated, high-performance computer vision pipeline designed for human-centric scene understanding and interaction analysis. This system integrates state-of-the-art deep learning models to provide real-time insights into human behavior, social dynamics, and service efficiency within complex environments.
 
-## Key Features
+## Core Intelligence Modules
 
-### Scene Intelligence
-- **REACT++ Integration**: Leverages state-of-the-art Scene Graph Generation for real-time object and relationship detection.
-- **Social Interaction Index (STAS)**: Advanced temporal analysis of human-to-human relationships, including talking, physical contact, and social proximity.
-- **Automated Role Discovery**: Distinguishes between Staff and Visitors based on mobility, social centrality, and Hand-Object Interaction (HOI) patterns.
-- **Temporal Smoothing**: Implements a 10-frame majority-voting buffer to eliminate semantic flickering and ensure stable interaction labels.
+### REACT++ Scene Graph Generation
+The engine leverages REACT++ for advanced Scene Graph Generation (SGG). Beyond simple object detection, it maps relationships between humans and their environment, enabling a semantic understanding of the scene. It identifies triplets consisting of subjects, predicates, and objects to build a dynamic knowledge graph of every frame.
 
-### Premium HUD Visualization
-- **Glassmorphism Interface**: Semi-transparent, dark-themed intelligence cards for roles and satisfaction metrics.
-- **Anti-Aliased Typography**: High-quality PIL-based rendering for professional-grade text and graphics.
-- **Glow-Effect Relationships**: Cyan-glowing "energy cords" visualize social dynamics between individuals.
-- **Customer Satisfaction Index**: Real-time dashboard calculating aggregate visitor happiness from emotion trends.
+### Spatial-Temporal Interaction Mode (STAS)
+The STAS module performs continuous analysis of human-to-human relationships. Key features include:
+- Synchronicity Analysis: Cross-correlation of movement velocity and head orientation to identify group bonding.
+- Personal Space Monitoring: Constructing dynamic polygons around tracked individuals to detect Intimate Space violations.
+- Interaction Smoothing: A temporal buffer system that uses majority-voting to eliminate semantic flickering and ensure stable relationship labels.
 
-### Robust CV Core
-- **Multi-Object Tracking**: DEEPOCSORT (via BoxMOT) for persistent person identification.
-- **HSEmotion Analysis**: State-of-the-art emotion detection for real-time satisfaction monitoring.
-- **MiVOLO Demographics**: Precise age and gender estimation using face and body features.
-- **Structured Logging**: Frame-by-frame JSONL output for downstream data science and analytics.
+### Specialized Human Analysis
+- HSEmotion Analysis: Utilizes state-of-the-art emotion detection models to track real-time satisfaction levels and sentiment trends.
+- MiVOLO Demographics: Provides high-precision age and gender estimation using multi-modal face and body feature extraction.
+- RTMPose Estimation: High-frequency pose tracking used for posture detection (Standing, Sitting, Crouching) and gesture analysis.
+
+## Advanced Behavioral Insights
+
+### Unsupervised Role Discovery
+The pipeline automatically distinguishes between different roles (e.g., Staff vs. Visitors) without manual labeling. This is achieved through an multi-factor algorithm analyzing:
+- Spatial Centrality: Persistence at specific service posts or counters.
+- Mobility Index: Analysis of total distance covered relative to time elapsed.
+- Hand-Object Interaction (HOI): Tracking interactions with specific equipment such as cashier registries or office hardware.
+
+### Intent & Security Analytics
+The system detects specific behavioral patterns to generate actionable insights:
+- Scanning Behavior: Identifies stationary individuals with high-variance head orientation, signaling a need for pre-emptive service.
+- Theft Heuristics: Monitors hand occlusion and orientation relative to high-value objects and staff presence.
+
+## Cinematic HUD Visualization
+The visualization engine features a professional-grade HUD with:
+- Glassmorphism Interface: Semi-transparent, blur-effect intelligence cards for role and satisfaction metrics.
+- Glowing Energy Links: Curved Bezier pulses that visualize social dynamics and interaction types between individuals.
+- Dynamic Dashboard: A real-time summary of total counts, staff-to-visitor ratios, active engagements, and the Customer Satisfaction Index.
 
 ## Repository Structure
 
-```bash
+```text
 IA-Camera-Challenge/
 ├── cv_pipeline/
-│   ├── detection/          # REACT++ SGG & Human Detection
-│   ├── tracking/           # BoxMOT tracking module
-│   ├── pose_estimation/    # RTMPose & Pose Analysis
-│   ├── emotion_analysis/   # HSEmotion & MiVOLO
-│   ├── social_interaction/ # SocialAnalyzer & Role Discovery
-│   └── utils/              # UIProcessor HUD & Scene Describer
-├── scripts/
-│   ├── run_full_pipeline.py  # Main entry point
-│   └── download_model.py     # Model setup helper
-├── models/                 # Model weights (REACT++, RTMPose, Face)
-└── scene_log.json          # Structured frame-by-frame data
+│   ├── detection/          # REACT++ SGG and human detection
+│   ├── tracking/           # DEEPOCSORT multi-object tracking
+│   ├── emotion_analysis/   # HSEmotion sentiment tracking
+│   ├── social_interaction/ # STAS relationship engine
+│   ├── pose_estimation/    # RTMPose analysis
+│   └── utils/              # Cinematic HUD and scene logs
+├── SGG-Benchmark/          # Core SGG weights and utilities
+├── models/                 # Pre-trained deep learning weights
+└── scripts/                # Entry points for batch and real-time processing
 ```
 
-## Quick Start
+## Setup and Deployment
 
-### Prerequisites
-- Python 3.11+
-- NVIDIA GPU with CUDA 12.1+ support
+### Requirements
+- Python 3.11 or higher
+- NVIDIA GPU with CUDA 12.1 support
+- Minimum 16GB System RAM
 
 ### Installation
-1. Setup virtual environment: `python -m venv venv`
-2. Install dependencies: `pip install -r requirements.txt`
-3. Ensure model weights are placed in the models/ directory as specified in the configuration.
+1. Initialize the environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Download the necessary model weights as specified in the model configuration files.
 
-### Usage
+### Execution
+Run the full intelligence pipeline on a video file or live stream:
 ```bash
 python cv_pipeline/scripts/run_full_pipeline.py [video_path] --output [output_name.mp4]
 ```
 
-## Outputs
-- **Annotated Video**: High-quality MP4 with ID, Role, Satisfaction, and Interaction HUD.
-- **Intelligence Log**: JSONL structured data file for high-level scene metrics and behavioral analysis.
+## Data Output
+The system generates a high-fidelity intelligence log in JSONL format, documenting every detected entity, relationship, and behavioral event with precise timestamps for downstream analytical processing.
 
 ---
 **Maintained by**: Amzilynn | **Engine**: REACT++ SGG + Custom Scene Intelligence
