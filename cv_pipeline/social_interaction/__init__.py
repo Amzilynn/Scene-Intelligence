@@ -1,2 +1,1 @@
 from .social_analyzer import SocialAnalyzer
-from .satisfaction_analyzer import SatisfactionAnalyzer

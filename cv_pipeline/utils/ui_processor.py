@@ -188,49 +188,37 @@ class UIProcessor:
             draw.text((cx + 28, cy + 4), role.upper(), font=self.fonts['tiny'], fill=self.colors['text_dim'])
             draw.text((cx + 10, cy + 18), f"{emotion.upper()}", font=self.fonts['small'], fill=self.colors['text_main'])
 
-        # 3. CYBER-AGENT DASHBOARD (Multi-Panel Redesign)
+        # 3. PREMIUM DASHBOARD (Top Right)
         margin = 30
-        dash_x = orig_w - 360 - margin
+        dash_w, dash_h = 320, 180
+        dash_x = orig_w - dash_w - margin
+        dash_y = margin
         
-        # Panel A: Main Metrics (Top Right)
-        pa_w, pa_h = 360, 110
-        pa_y = margin
-        self.draw_glass_panel(pil_img, overlay_layer, (dash_x, pa_y), (pa_w, pa_h), blur=20)
-        draw.line([(dash_x, pa_y), (dash_x+pa_w, pa_y)], fill=self.colors['accent'], width=2) # Top accent
-        draw.text((dash_x + 15, pa_y + 10), "SCENE INTELLIGENCE UNIT // LIVE", font=self.fonts['tiny'], fill=self.colors['accent'])
+        # Dashboard Glass Panel
+        self.draw_glass_panel(pil_img, overlay_layer, (dash_x, dash_y), (dash_w, dash_h), radius=20, blur=25)
         
-        # Satisfaction Index
-        draw.text((dash_x + 15, pa_y + 35), "SATISFACTION INDEX", font=self.fonts['tiny'], fill=self.colors['text_dim'])
-        draw.text((dash_x + pa_w - 65, pa_y + 25), f"{int(idx)}%", font=self.fonts['large'], fill=(255, 255, 255))
-        self.draw_gradient_bar(draw, (dash_x + 15, pa_y + 65), (pa_w - 30, 8), idx, self.colors['sad'], self.colors['happy'])
+        # Title
+        title_font = self.fonts['medium']
+        draw.text((dash_x + 20, dash_y + 15), "SCENE INTELLIGENCE", font=title_font, fill=(200, 0, 200, 255)) # Pinkish magenta
         
-        # Panel B: Analytics Feed (Attached Below Panel A)
-        pb_w, pb_h = 360, 100
-        pb_y = pa_y + pa_h + 10
-        self.draw_glass_panel(pil_img, overlay_layer, (dash_x, pb_y), (pb_w, pb_h), blur=20)
-        
-        stats = [
-            ("TOTAL VISITORS", f"{global_metrics.get('visitor_count', 0)}", self.colors['visitor']),
-            ("ENGAGEMENTS", f"{global_metrics.get('active_engagements', 0)}", self.colors['happy']),
-            ("SOCIAL GROUPS", f"{global_metrics.get('group_count', 0)}", self.colors['accent'])
+        # Stats
+        stats_labels = [
+            ("TOTAL PEOPLE", f"{global_metrics.get('total_people', 0)}"),
+            ("STAFF / VISITORS", f"{global_metrics.get('staff_count', 0)} / {global_metrics.get('visitor_count', 0)}"),
+            ("ACTIVE INTERACT", f"{global_metrics.get('active_engagements', 0)}"),
+            ("SATISFACTION", f"{int(idx)}%")
         ]
-        for i, (l, v, c) in enumerate(stats):
-            y_off = pb_y + 15 + (i * 26)
-            draw.text((dash_x + 15, y_off), l, font=self.fonts['tiny'], fill=self.colors['text_dim'])
-            draw.text((dash_x + 300, y_off - 4), v, font=self.fonts['medium'], fill=c)
-            draw.line([(dash_x + 15, y_off + 20), (dash_x + pb_w - 15, y_off + 20)], fill=(255, 255, 255, 20), width=1)
-
-        # Panel C: System Vibe (Floating Pill)
-        vibe_title = "STABLE"
-        if idx > 85: vibe_title = "EXCELLENT"
-        elif idx < 50: vibe_title = "CRITICAL"
         
-        pc_w, pc_h = 360, 45
-        pc_y = pb_y + pb_h + 10
-        self.draw_glass_panel(pil_img, overlay_layer, (dash_x, pc_y), (pc_w, pc_h), blur=20)
-        draw.rectangle([dash_x, pc_y, dash_x+6, pc_y+pc_h], fill=vibe_color)
-        draw.text((dash_x + 15, pc_y + 5), "SYSTEM VIBE ANALYSIS", font=self.fonts['tiny'], fill=self.colors['text_dim'])
-        draw.text((dash_x + 15, pc_y + 20), f"STATUS: {vibe_title} // NOMINAL FLOW", font=self.fonts['small'], fill=(255,255,255))
+        stats_font = self.fonts['small']
+        val_font = self.fonts['medium']
+        
+        for i, (label, val) in enumerate(stats_labels):
+            y_off = dash_y + 55 + (i * 30)
+            draw.text((dash_x + 20, y_off), label, font=stats_font, fill=self.colors['text_dim'])
+            
+            # Right-aligned value
+            text_w = draw.textlength(val, font=val_font)
+            draw.text((dash_x + dash_w - text_w - 20, y_off - 4), val, font=val_font, fill=self.colors['text_main'])
 
         # Final Compositing
         self.draw_scanlines(draw_scan, (orig_w, orig_h))

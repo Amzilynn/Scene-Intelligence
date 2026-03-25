@@ -63,40 +63,59 @@ class PersonTracker:
 
         tracks = self.tracker.update(dets_array, frame)
 
+        tracked_detections = []
         if tracks.shape[0] > 0:
-            assigned_tracks = set()
-            for det in detections:
-                det_bbox = np.array(det['bbox'])
-
+            assigned_dets = set()
+            
+            for trk in tracks:
+                x1, y1, x2, y2 = trk[:4]
+                track_id = int(trk[4])
+                # Some trackers return 7 elements, some 8. Conf is usually at index 5 for BoxMOT
+                conf = float(trk[5]) if len(trk) > 5 else 1.0
+                
                 best_idx = -1
                 best_iou = 0
-
-                for j, trk in enumerate(tracks):
-                    if j in assigned_tracks:
+                track_bbox = np.array([x1, y1, x2, y2])
+                
+                for j, det in enumerate(detections):
+                    if j in assigned_dets:
                         continue
-                    track_bbox = trk[:4]
-                    iou = self._compute_iou(det_bbox, track_bbox)
+                    iou = self._compute_iou(np.array(det['bbox']), track_bbox)
                     if iou > best_iou:
                         best_iou = iou
                         best_idx = j
-
+                        
                 if best_idx >= 0 and best_iou > 0.3:
-                    assigned_tracks.add(best_idx)
-                    track_id = int(tracks[best_idx, 4])
-                    det['track_id'] = track_id
-                    det['track_color'] = self.id_colors[track_id % len(self.id_colors)]
-                    
-                    # Apply Kalman-smoothed bounding box from tracker to prevent flickering
-                    det['bbox'] = tuple(tracks[best_idx, :4])
+                    assigned_dets.add(best_idx)
+                    det = detections[best_idx].copy()
                 else:
-                    det['track_id'] = -1
-                    det['track_color'] = (128, 128, 128)
+                    # Coasted track: YOLO missed it this frame, but tracker predicts it
+                    det = {
+                        "type": "person",
+                        "conf": conf,
+                        "pose_keypoints": None,
+                        "faces": []
+                    }
+                    
+                det['bbox'] = (x1, y1, x2, y2)
+                det['track_id'] = track_id
+                det['track_color'] = self.id_colors[track_id % len(self.id_colors)]
+                tracked_detections.append(det)
+                
+            # Add unconfirmed YOLO detections (new people not yet tracked)
+            for j, det in enumerate(detections):
+                if j not in assigned_dets:
+                    det_copy = det.copy()
+                    det_copy['track_id'] = -1
+                    det_copy['track_color'] = (128, 128, 128)
+                    tracked_detections.append(det_copy)
+                    
+            return tracked_detections
         else:
             for det in detections:
                 det['track_id'] = -1
                 det['track_color'] = (128, 128, 128)
-
-        return detections
+            return detections
 
     def reset(self):
         """Reset tracker state."""

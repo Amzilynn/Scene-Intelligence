@@ -107,8 +107,10 @@ class SocialAnalyzer:
         """
         Cross-correlation of velocity and head-orientation over 45 frames.
         """
-        h1 = list(self.history[id1])[-45:]
-        h2 = list(self.history[id2])[-45:]
+        h1_full = list(self.history[id1])
+        h1 = h1_full[-45:]
+        h2_full = list(self.history[id2])
+        h2 = h2_full[-45:]
         if len(h1) < 45 or len(h2) < 45: return 0.0
         
         # Velocity correlation
@@ -220,16 +222,16 @@ class SocialAnalyzer:
                 poly1 = self._get_personal_space_polygon(tracked_dets[i].get('pose_keypoints'), tracked_dets[i]['bbox'])
                 poly2 = self._get_personal_space_polygon(tracked_dets[j].get('pose_keypoints'), tracked_dets[j]['bbox'])
                 
-                if self._check_polygon_intersection(poly1, poly2):
-                    # Check if Nose-to-Neck vector intersects other's bbox (Intentional focus)
+                # Compute explicit interactions (talking, walking, approaching, physical contact)
+                itype = self._detect_pair_interaction(tracked_dets[i], tracked_dets[j])
+                if itype:
+                    raw_pair_candidates[pair_ids].append(itype)
+                else:
+                    # Fallback: check if they are intentionally focusing on each other via raycasting
                     focus_a = self._check_intentional_focus(tracked_dets[i], tracked_dets[j])
                     focus_b = self._check_intentional_focus(tracked_dets[j], tracked_dets[i])
-                    
                     if focus_a or focus_b:
-                        itype = self._detect_pair_interaction(tracked_dets[i], tracked_dets[j])
-                        if itype:
-                            raw_pair_candidates[pair_ids].append(itype)
-
+                        raw_pair_candidates[pair_ids].append("Intentional Focus")
         # 3. TEMPORAL SMOOTHING (Anti-Flicker Logic)
         current_pair_states = set()
         from collections import Counter
@@ -318,69 +320,49 @@ class SocialAnalyzer:
                 'start_time': current_time, 
                 'unique_contacts': set(),
                 'staff_proximity_count': 0,
-                'total_frames': 0
+                'total_frames': 0,
+                'assigned_role': 'Visitor'
             }
         
         stats = self.role_stats[tid]
         stats['total_frames'] += 1
         
-        # Check proximity to staff-related objects
+        # 1. Proximity to staff-related objects
         person_center = self._get_center(det['bbox'])
         for obj in objects:
             obj_type = obj.get('type', obj.get('label', 'unknown')).lower()
             if obj_type in self.STAFF_OBJECT_LABELS:
                 obj_center = self._get_center(obj['bbox'])
                 dist = np.linalg.norm(person_center - obj_center)
-                if dist < 150: # Standard proximity threshold
+                if dist < 150:
                     stats['staff_proximity_count'] += 1
                     break
         
-        # Check HOI: Is hand near object?
-        kpts = det.get('pose_keypoints')
-        if kpts is not None and len(kpts) > 10:
-            hands = [kpts[9], kpts[10]] # Wrists
-            for h in hands:
-                if h[2] > 0.5:
-                    for obj in objects:
-                        obj_bbox = obj['bbox']
-                        # Buffer distance 20px
-                        if (obj_bbox[0]-20 <= h[0] <= obj_bbox[2]+20 and 
-                            obj_bbox[1]-20 <= h[1] <= obj_bbox[3]+20):
-                            stats['hoi_count'] += 1
-                            stats['unique_contacts'].add(obj.get('type', obj.get('label', 'unknown')))
-                            
-            # Check Gesture: Open Palm (Wrist to Elbow extension)
-            # Simplistic: if distance is large enough relative to shoulder width
-            sh_width = np.linalg.norm(kpts[5][:2] - kpts[6][:2])
-            ext_l = np.linalg.norm(kpts[9][:2] - kpts[7][:2])
-            ext_r = np.linalg.norm(kpts[10][:2] - kpts[8][:2])
-            if ext_l > 0.6 * sh_width or ext_r > 0.6 * sh_width:
-                stats['open_palm_frames'] += 1
-
-        # Logic for Staff Labeling: 
-        # Persistent proximity to staff objects + some hand activity
-        assigned = stats.get('assigned_role')
-        if assigned == "Staff":
-            role = "Staff"
-        else:
-            prox_ratio = stats.get('staff_proximity_count', 0) / stats['total_frames']
-            if stats['staff_proximity_count'] > 15 and prox_ratio > 0.1:
-                role = "Staff"
-                stats['assigned_role'] = "Staff"
-            else:
-                role = "Visitor"
-            
-        # Add telemetry for debugging
-        det['proximity_metrics'] = {
-            'prox_ratio': stats.get('staff_proximity_count', 0) / stats['total_frames'],
-            'prox_count': stats['staff_proximity_count'],
-            'total_frames': stats['total_frames'],
-            'hoi_count': stats['hoi_count'],
-            'open_palm': stats['open_palm_frames'],
-            'assigned': stats.get('assigned_role', 'none')
-        }
+        # 2. Mobility Tracking (Anchor Detection)
+        # If someone is persistent and stationary, they are likely staff
+        time_elapsed = current_time - stats['start_time']
+        mobility = stats['total_distance'] / (time_elapsed + 1e-6)
         
-        return role
+        # 3. Sticky Logic for Staff
+        if stats['assigned_role'] == 'Staff':
+            return 'Staff'
+            
+        # 4. Role Assignment Heuristics
+        if time_elapsed > 15: # Need 15s to be sure
+            prox_ratio = stats.get('staff_proximity_count', 0) / stats['total_frames']
+            
+            # Condition A: Near Staff Objects (laptop/cashier)
+            if stats['staff_proximity_count'] > 30 and prox_ratio > 0.2:
+                stats['assigned_role'] = 'Staff'
+                return 'Staff'
+                
+            # Condition B: Stationary Anchor (Likely behind a counter)
+            # If they move less than 20px/s on average and stay for 15s
+            if mobility < 20 and stats['total_frames'] > 150:
+                stats['assigned_role'] = 'Staff'
+                return 'Staff'
+                
+        return 'Visitor'
 
     def _check_security_intent(self, det, objects):
         """Theft: Hand near high-value object + Orientation away from Staff."""
@@ -489,14 +471,15 @@ class SocialAnalyzer:
             
         avg_speed = np.mean(speeds)
         
-        if avg_speed < 15:
+        # Tracking jitter can easily be 2-3 pixels per frame, which is 60-90 px/s!
+        if avg_speed < 100:
             return "Stationary"
-        elif avg_speed < 60:
+        elif avg_speed < 250:
             return "Walking"
         else:
             return "Running"
 
-    def is_stationary(self, track_id, threshold=10):
+    def is_stationary(self, track_id, threshold=100):
         if track_id not in self.history or len(self.history[track_id]) < self.fps:
             return False
         recent = list(self.history[track_id])[-self.fps:]
@@ -531,8 +514,8 @@ class SocialAnalyzer:
         avg_h = (h_a + h_b) / 2
         
         # Thresholds scaled by person height (Social context: 0.8h is close, 1.5h is social)
-        PROXIMITY_THRES = avg_h * 0.8
-        WALKING_THRES = avg_h * 1.2
+        PROXIMITY_THRES = avg_h * 1.8 # Increased heavily for robust interaction
+        WALKING_THRES = avg_h * 2.2
         
         # Facing logic
         vector_a_to_b = pos_b - pos_a
@@ -542,7 +525,7 @@ class SocialAnalyzer:
         angle_a = self._calculate_angle(facing_a, vector_a_to_b) if facing_a is not None else 180
         angle_b = self._calculate_angle(facing_b, -vector_a_to_b) if facing_b is not None else 180
         
-        facing_each_other = angle_a < 50 and angle_b < 50
+        facing_each_other = angle_a < 90 and angle_b < 90 # Generous 90-degree leniency
         
         # 2. TEMPORAL FEATURES
         vel_a = (pos_a - prev_a['pos']) / self.dt
@@ -560,11 +543,11 @@ class SocialAnalyzer:
         # Rule 1: Service/Helping (High Priority)
         # If one is Staff and they are facing each other while close
         if (role_a == "Staff" or role_b == "Staff") and dist < PROXIMITY_THRES * 1.5:
-            if facing_each_other or (role_a == "Staff" and angle_b < 45) or (role_b == "Staff" and angle_a < 45):
+            if facing_each_other or (role_a == "Staff" and angle_b < 60) or (role_b == "Staff" and angle_a < 60):
                 return "Service/Helping"
 
-        # Rule 2: Talking (Facing + Close + Stationary)
-        if dist < PROXIMITY_THRES and facing_each_other and avg_speed_a < 15:
+        # Rule 2: Talking (Facing + Close)
+        if dist < PROXIMITY_THRES and facing_each_other:
             return "Talking"
             
         # Rule 3: Walking Together

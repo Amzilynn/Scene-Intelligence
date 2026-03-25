@@ -19,6 +19,8 @@ from cv_pipeline.tracking.boxmot_tracker import PersonTracker
 from cv_pipeline.emotion_analysis.emotion_analyzer import EmotionAnalyzer
 from cv_pipeline.social_interaction.social_analyzer import SocialAnalyzer
 from cv_pipeline.utils.scene_describer import SceneDescriber
+from cv_pipeline.utils.ui_processor import UIProcessor
+from cv_pipeline.utils.metrics_tracker import HUDMetricsTracker
 
 def run_pipeline(video_path, output_path="final_output.mp4", headless=False, log_file="scene_log.json"):
     # 1. Initialization
@@ -45,7 +47,7 @@ def run_pipeline(video_path, output_path="final_output.mp4", headless=False, log
 
     # Output video writer
     # avc1 (H.264) is universally supported by web browsers
-    fourcc = cv2.VideoWriter_fourcc(*'avc1') 
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v') 
     
     # Adjust output dimensions if we plan to downscale
     out_width, out_height = width, height
@@ -81,6 +83,12 @@ def run_pipeline(video_path, output_path="final_output.mp4", headless=False, log
         log_file = get_root_path(log_file)
         
     scene_describer = SceneDescriber(log_file=log_file)
+    print(f"I: Video Properties: {width}x{height} @ {fps:.2f} fps, {total_frames} frames")
+    
+    # 3. HUD and Metrics Stabilization
+    ui_processor = UIProcessor()
+    # 30 frames (1s) gives a snappy but stable dashboard given the new BoxMOT coasting
+    metrics_tracker = HUDMetricsTracker(window_size=30, ema_alpha=0.1)
 
     print("I: Pipeline initialized. Starting loop...")
 
@@ -225,60 +233,54 @@ def run_pipeline(video_path, output_path="final_output.mp4", headless=False, log
         desc_text = scene_describer.describe(social_detections, frame_count, width=frame.shape[1], height=frame.shape[0], interactions=interactions)
         scene_describer.save_log(desc_text)
 
-        # 8. Visualization
-        drawn_frame = detector.draw(frame, detections, draw_skeleton=True, draw_faces=True)
+        # 8. Visualization (Premium HUD)
+        # Current Frame Raw Stats
+        current_persons = [d for d in detections if d['type'] == 'person']
+        total_current = len(current_persons)
         
-        # Draw Interactions
-        for inter in interactions:
-            id1, id2 = inter['ids']
-            label = inter['type']
-            try:
-                p1 = [d for d in detections if d.get('track_id_original', d.get('track_id')) == id1][0]
-                p2 = [d for d in detections if d.get('track_id_original', d.get('track_id')) == id2][0]
-                c1 = [(p1['bbox'][0]+p1['bbox'][2])/2, (p1['bbox'][1]+p1['bbox'][3])/2]
-                c2 = [(p2['bbox'][0]+p2['bbox'][2])/2, (p2['bbox'][1]+p2['bbox'][3])/2]
-                cx, cy = int((c1[0]+c2[0])/2), int((c1[1]+c2[1])/2)
-                cv2.putText(drawn_frame, f"<< {label} >>", (cx - 50, cy), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                cv2.line(drawn_frame, (int(c1[0]), int(c1[1])), (int(c2[0]), int(c2[1])), (0, 255, 0), 1)
-            except: pass
-
-        # Draw Intent Badges
-        for det in detections:
-            x1, y1, x2, y2 = map(int, det['bbox'])
-            curr_y = y1 - 10
+        # Staff vs Visitor (Checking role assignment)
+        staff_count = sum(1 for d in current_persons if 'staff' in str(d.get('role', '')).lower())
+        
+        engaged_people = set()
+        for interaction in interactions:
+            if interaction.get('type') not in ['Group_Bond', 'Proximity']:
+                engaged_people.update(interaction.get('ids', []))
+        active_engagements = len(engaged_people)
+        
+        # Raw Satisfaction Index from emotions (Handling HSEmotion labels)
+        idx_raw = 75.0
+        if total_current > 0:
+            # Common emotion labels from HSEmotion/DeepFace
+            pos_labels = ['happy', 'happiness', 'surprise', 'surprised']
+            neu_labels = ['neutral']
             
-            # Role (Now with HOI Validation info)
-            role = det.get('role', 'Analyzing...')
-            role_color = (255, 100, 0) if "Staff" in role else (100, 100, 100)
-            curr_y -= draw_badge(drawn_frame, f"ROLE: {role}", (x1, curr_y), role_color)
+            # Use a more nuanced sentiment mapping:
+            # Positive: 100%, Neutral: 80%, Negative: 50%
+            emotions = [str(d.get('emotion', 'neutral')).lower() for d in current_persons]
+            weights = []
+            for e in emotions:
+                if any(label in e for label in pos_labels):
+                    weights.append(1.0)
+                elif any(label in e for label in neu_labels):
+                    weights.append(0.8)
+                else: 
+                    # Negative or others (Sad, Angry, Fear, Disgust)
+                    weights.append(0.5)
             
-            # Intent Badge
-            intent = det.get('intent', 'Normal')
-            intent_color = (0, 0, 255) if intent != "Normal" else (50, 50, 50)
-            curr_y -= draw_badge(drawn_frame, f"INTENT: {intent}", (x1, curr_y), intent_color)
-
-            # --- Restore Emotion & Secondary Info ---
-            # Emotion Badge
-            emotion = det.get('emotion', 'N/A')
-            emo_colors = {
-                'happy': (0, 200, 0),        # Green
-                'sad': (200, 0, 0),          # Blue
-                'angry': (0, 0, 200),        # Red
-                'surprise': (0, 200, 200),   # Yellow
-                'fear': (150, 0, 150),       # Purple
-                'neutral': (150, 150, 150),  # Gray
-            }
-            emo_color = emo_colors.get(emotion.lower(), (100, 100, 100))
-            mood_trend = det.get('mood_trend', "")
-            display_emo = f"EMO: {emotion} {mood_trend}"
-            curr_y -= draw_badge(drawn_frame, display_emo, (x1, curr_y), emo_color)
-
-            # Secondary Info (Age/Gender)
-            age = det.get('age', 'N/A')
-            gender = det.get('gender', 'N/A')
-            info_text = f"{gender} | Age: {age}"
-            draw_badge(drawn_frame, info_text, (x1, curr_y), (50, 50, 50))
+            idx_raw = float(sum(weights) / total_current * 100.0)
+        
+        # 9. APPLY HUD METRICS TRACKER (SMOOTHING & CONSISTENCY)
+        raw_metrics = {
+            'total_people': total_current,
+            'staff_count': staff_count,
+            'active_engagements': active_engagements,
+            'satisfaction_index': idx_raw
+        }
+        
+        global_metrics = metrics_tracker.update(raw_metrics)
+        
+        # 10. Render HUD
+        drawn_frame = ui_processor.render_hud(frame, detections, interactions, global_metrics)
 
         if not headless:
             display_frame = cv2.resize(drawn_frame, (1280, 720))
